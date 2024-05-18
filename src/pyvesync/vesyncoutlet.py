@@ -21,6 +21,8 @@ outlet_config = {
         'module': 'VeSyncOutlet15A'},
     'ESO15-TB': {
         'module': 'VeSyncOutdoorPlug'},
+    'WHOGPLUG': {
+        'module': 'VeSyncWhogPlug'},
 }
 
 outlet_modules = {k: v['module'] for k, v in outlet_config.items()}
@@ -739,3 +741,123 @@ class VeSyncOutdoorPlug(VeSyncOutlet):
     def turn_off(self) -> bool:
         """Turn outdoor outlet off and return True if successful."""
         return bool(self.toggle('off'))
+
+
+class VeSyncWhogPlug(VeSyncOutlet):
+    """Etekcity WhogPlug Outlet Class."""
+
+    def __init__(self, details, manager):
+        """Initilize WhogPlug outlet class."""
+        super().__init__(details, manager)
+        self.det_keys = ['enabled', 'energy', 'power', 'voltage']
+        self.energy_keys = ['energyConsumptionOfToday',
+                            'maxEnergy', 'totalEnergy']
+
+    def get_details(self) -> None:
+        """Get WhogPlug outlet details."""
+        head = Helpers.bypass_header()
+        body = Helpers.bypass_body_v2(self.manager)
+        body['cid'] = self.cid
+        body['configModule'] = self.config_module
+        body['payload'] = {
+            'method': 'getOutletStatus',
+            'source': 'APP',
+            'data': {}
+        }
+
+        r, _ = Helpers.call_api(
+            '/cloud/v2/deviceManaged/bypassV2',
+            method='post',
+            headers=head,
+            json_object=body,
+        )
+
+        if r is not None and r['result']['code'] == 0:
+            r = r['result']['result']
+
+        if r is not None and all(x in r for x in self.det_keys):
+            self.device_status = r.get('enabled', False)
+            self.details['energy'] = r.get('energy', 0)
+            self.details['power'] = r.get('power', 0)
+            self.details['voltage'] = r.get('voltage', 0)
+        else:
+            logger.debug('Unable to get %s details', self.device_name)
+
+    def get_weekly_energy(self) -> None:
+        """Get WhogPlug outlet weekly energy info and buld weekly energy dict."""
+        # TODO: Broken with new API / new implementation needed
+        return
+
+    def get_monthly_energy(self) -> None:
+        """Get WhogPlug outlet monthly energy info and buld monthly energy dict."""
+        # TODO: Broken with new API / new implementation needed
+        return
+
+    def get_yearly_energy(self) -> None:
+        """Get WhogPlug outlet yearly energy info and build yearly energy dict."""
+        # TODO: Broken with new API / new implementation needed
+        return
+
+    def turn_on(self) -> bool:
+        """Turn WhogPlug outlet on - return True if successful."""
+
+        head = Helpers.bypass_header()
+        body = Helpers.bypass_body_v2(self.manager)
+        body['cid'] = self.cid
+        body['configModule'] = self.config_module
+        body['payload'] = {
+            'method': 'setSwitch',
+            'source': 'APP',
+            'data': {
+                'enabled': True,
+                'id': 0
+            }
+        }
+
+        r, _ = Helpers.call_api(
+            '/cloud/v2/deviceManaged/bypassV2',
+            method='post',
+            headers=head,
+            json_object=body,
+        )
+
+        if not isinstance(r, dict) or r.get('code') != 0:
+            logger.debug("Error in setting outlet status")
+            return False
+
+        self.device_status = 'on'
+        return True
+
+    def turn_off(self) -> bool:
+        """Turn WhogPlug outlet off - return True if successful."""
+        head = Helpers.bypass_header()
+        body = Helpers.bypass_body_v2(self.manager)
+        body['cid'] = self.cid
+        body['configModule'] = self.config_module
+        body['payload'] = {
+            'method': 'setSwitch',
+            'source': 'APP',
+            'data': {
+                'enabled': False,
+                'id': 0
+            }
+        }
+
+        r, _ = Helpers.call_api(
+            '/cloud/v2/deviceManaged/bypassV2',
+            method='post',
+            headers=head,
+            json_object=body,
+        )
+
+        if not isinstance(r, dict) or r.get('code') != 0:
+            logger.debug("Error in setting outlet status")
+            return False
+
+        self.device_status = 'off'
+        return True
+
+    def get_config(self) -> None:
+        """Get WhogPlug outlet configuration info."""
+        # TODO: Broken with new API / new implementation needed
+        return
