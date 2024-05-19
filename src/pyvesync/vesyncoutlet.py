@@ -776,7 +776,7 @@ class VeSyncWhogPlug(VeSyncOutlet):
             r = r['result']['result']
 
         if r is not None and all(x in r for x in self.det_keys):
-            self.device_status = r.get('enabled', False)
+            self.device_status = 'on' if r.get('enabled', 'off') == True else 'off'
             self.details['energy'] = r.get('energy', 0)
             self.details['power'] = r.get('power', 0)
             self.details['voltage'] = r.get('voltage', 0)
