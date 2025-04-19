@@ -1,8 +1,10 @@
 """Etekcity Outlets."""
+from datetime import datetime, timedelta
 
 import logging
 import time
 import json
+import pprint
 from abc import ABCMeta, abstractmethod
 
 from pyvesync.helpers import Helpers
@@ -405,6 +407,7 @@ class VeSyncOutlet10A(VeSyncOutlet):
 
         if Helpers.code_check(response):
             self.device_status = 'on'
+            self.update()
             return True
         logger.warning('Error turning %s on', self.device_name)
         return False
@@ -424,6 +427,7 @@ class VeSyncOutlet10A(VeSyncOutlet):
 
         if Helpers.code_check(response):
             self.device_status = 'off'
+            self.update()
             return True
         logger.warning('Error turning %s off', self.device_name)
         return False
@@ -772,13 +776,31 @@ class VeSyncWhogPlug(VeSyncOutlet):
             json_object=body,
         )
 
-        if r is not None and r['result']['code'] == 0:
+        body['payload'] = {
+            "data": {
+                "fromDay": int((datetime.now() - timedelta(days=1)).timestamp()),
+                "toDay": int(datetime.now().timestamp())
+            },
+            "method": "getEnergyHistory",
+            "subDeviceNo": 0,
+            "source": "APP"
+        }
+
+        energy, _ = Helpers.call_api(
+            '/cloud/v2/deviceManaged/bypassV2',
+            method='post',
+            headers=head,
+            json_object=body,
+        )
+
+        if r is not None and r['code'] == 0:
             r = r['result']['result']
+            energy = energy['result']['result']
 
         if r is not None and all(x in r for x in self.det_keys):
             self.device_status = 'on' if r.get('enabled', 'off') == True else 'off'
             self.details['energy'] = r.get('energy', 0)
-            self.details['power'] = r.get('power', 0)
+            self.details['power'] = energy['energyInfos'][0]['energy']
             self.details['voltage'] = r.get('voltage', 0)
         else:
             logger.debug('Unable to get %s details', self.device_name)
@@ -821,12 +843,12 @@ class VeSyncWhogPlug(VeSyncOutlet):
             json_object=body,
         )
 
-        if not isinstance(r, dict) or r.get('code') != 0:
-            logger.debug("Error in setting outlet status")
-            return False
+        if Helpers.code_check(r):
+            self.device_status = 'on'
+            return True
 
-        self.device_status = 'on'
-        return True
+        logger.warning('Error turning %s on', self.device_name)
+        return False
 
     def turn_off(self) -> bool:
         """Turn WhogPlug outlet off - return True if successful."""
@@ -850,12 +872,12 @@ class VeSyncWhogPlug(VeSyncOutlet):
             json_object=body,
         )
 
-        if not isinstance(r, dict) or r.get('code') != 0:
-            logger.debug("Error in setting outlet status")
-            return False
+        if Helpers.code_check(r):
+            self.device_status = 'off'
+            return True
 
-        self.device_status = 'off'
-        return True
+        logger.warning('Error turning %s off', self.device_name)
+        return False
 
     def get_config(self) -> None:
         """Get WhogPlug outlet configuration info."""
